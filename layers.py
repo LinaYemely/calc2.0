@@ -1,12 +1,12 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib import slim
+import tf_slim as  slim
 
 
 def rand_warp(images, out_size, max_warp=0.5, name='rand_hom'):
-    num_batch = tf.shape(images)[0]
-    y = tf.lin_space(-1., 1., 2)
-    x = tf.lin_space(-1., 1., 2)
+    num_batch = tf.shape(input=images)[0]
+    y = tf.linspace(-1., 1., 2)
+    x = tf.linspace(-1., 1., 2)
     py, px = tf.meshgrid(y, x)
     pts_orig = tf.tile(tf.concat([tf.reshape(px, [1, -1, 1]), 
                           tf.reshape(py, [1, -1, 1])],
@@ -29,20 +29,20 @@ def rand_warp(images, out_size, max_warp=0.5, name='rand_hom'):
 
 def hom_warp(images, out_size, h, name='hom_warp'):
     def _repeat(x, n_repeats):
-        with tf.variable_scope('_repeat'):
+        with tf.compat.v1.variable_scope('_repeat'):
             rep = tf.transpose(
-                tf.expand_dims(tf.ones(shape=tf.stack([n_repeats, ])), 1), [1, 0])
+                a=tf.expand_dims(tf.ones(shape=tf.stack([n_repeats, ])), 1), perm=[1, 0])
             rep = tf.cast(rep, 'int32')
             x = tf.matmul(tf.reshape(x, (-1, 1)), rep)
             return tf.reshape(x, [-1])
 
     def _interpolate(im, x, y, out_size):
-        with tf.variable_scope('_interpolate'):
+        with tf.compat.v1.variable_scope('_interpolate'):
             # constants
-            num_batch = tf.shape(im)[0]
-            height = tf.shape(im)[1]
-            width = tf.shape(im)[2]
-            channels = tf.shape(im)[3]
+            num_batch = tf.shape(input=im)[0]
+            height = tf.shape(input=im)[1]
+            width = tf.shape(input=im)[2]
+            channels = tf.shape(input=im)[3]
 
             x = tf.cast(x, 'float32')
             y = tf.cast(y, 'float32')
@@ -51,8 +51,8 @@ def hom_warp(images, out_size, h, name='hom_warp'):
             out_height = out_size[0]
             out_width = out_size[1]
             zero = tf.zeros([], dtype='int32')
-            max_y = tf.cast(tf.shape(im)[1] - 1, 'int32')
-            max_x = tf.cast(tf.shape(im)[2] - 1, 'int32')
+            max_y = tf.cast(tf.shape(input=im)[1] - 1, 'int32')
+            max_x = tf.cast(tf.shape(input=im)[2] - 1, 'int32')
             
             # scale indices from [-1, 1] to [0, width/height]
             x = (x + 1.0)*(width_f) / 2.0
@@ -100,9 +100,9 @@ def hom_warp(images, out_size, h, name='hom_warp'):
             return output
 
     def _transform(images, out_size):
-        with tf.variable_scope('_transform'):
-            shape = tf.shape(images)
-            num_batch = tf.shape(images)[0]
+        with tf.compat.v1.variable_scope('_transform'):
+            shape = tf.shape(input=images)
+            num_batch = tf.shape(input=images)[0]
             num_channels = images.get_shape()[3]
             
             out_width = out_size[1]
@@ -113,10 +113,10 @@ def hom_warp(images, out_size, h, name='hom_warp'):
             grid = tf.expand_dims(tf.concat([tf.expand_dims(tf.reshape(x,[-1]),0),
                                   tf.expand_dims(tf.reshape(y,[-1]),0)], 0), 0)
             grid = tf.tile(grid, tf.stack([num_batch, 1, 1]))
-            grid_hom = tf.concat([grid, tf.ones([num_batch, 1, tf.shape(grid)[-1]])], axis=1)
+            grid_hom = tf.concat([grid, tf.ones([num_batch, 1, tf.shape(input=grid)[-1]])], axis=1)
             
-            W = tf.shape(images)[2]
-            H = tf.shape(images)[1]
+            W = tf.shape(input=images)[2]
+            H = tf.shape(input=images)[1]
             W = tf.cast(W, tf.float32)
             H = tf.cast(H, tf.float32)
             
@@ -136,7 +136,7 @@ def hom_warp(images, out_size, h, name='hom_warp'):
             output = tf.reshape(input_transformed, 
                     tf.stack([num_batch, out_height, out_width, num_channels]))
             return output
-    with tf.variable_scope(name):
+    with tf.compat.v1.variable_scope(name):
         output = _transform(images, out_size)
         return output
 
@@ -145,8 +145,8 @@ def estimate_hom(src, dst):
     ry = src[:,:,1:2]
     x = dst[:,:,0:1]
     y = dst[:,:,1:2]
-    num_batch = tf.shape(src)[0]
-    num_pts = tf.shape(src)[1]
+    num_batch = tf.shape(input=src)[0]
+    num_pts = tf.shape(input=src)[1]
     _0 = tf.zeros([num_batch, num_pts, 3])
     _1 = tf.ones([num_batch, num_pts, 1])
     A_even_rows = tf.concat([-rx, -ry, -_1, _0, rx*x, ry*x, x], axis=-1)
@@ -154,7 +154,7 @@ def estimate_hom(src, dst):
     
     A = tf.concat([A_even_rows, A_odd_rows], axis=-1)
     A = tf.reshape(A, [num_batch, 2*num_pts, 9])
-    _, _, V = tf.svd(A, full_matrices=True)
+    _, _, V = tf.linalg.svd(A, full_matrices=True)
     return tf.reshape(V[:,:,-1], [num_batch, 3, 3])
 
 
@@ -167,10 +167,10 @@ if __name__ == '__main__':
             cv2.COLOR_BGR2RGB) / 255.
     h = im.shape[0]
     w = im.shape[1]
-    x = tf.expand_dims(tf.placeholder_with_default(im.astype(np.float32), im.shape), 0)
+    x = tf.expand_dims(tf.compat.v1.placeholder_with_default(im.astype(np.float32), im.shape), 0)
     y = rand_warp(x, im.shape[:2])
     y = tf.clip_by_value(y+.5, 0.0, 1.)
-    with tf.Session() as sess:
+    with tf.compat.v1.Session() as sess:
         t = time()
         p = sess.run(y)
         print("Took", 1000*(time()-t), "ms")

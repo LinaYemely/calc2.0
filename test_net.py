@@ -81,7 +81,7 @@ def get_prec_recall(model_dir, data_path, num_include=5,
 	
     n_incorrect = 0
 
-    with tf.Session() as sess:
+    with tf.compat.v1.Session() as sess:
         calc = utils.CALC2(model_dir, sess, ret_c5=True, checkpoint=checkpoint)
         for fl in mem_files:    
             print("loading image ", fl, " to database")
@@ -366,7 +366,7 @@ def find_best_checkpoint(model_dir, data_path, num_include=5):
     for ckpt_file in ckpt_files:
         precision, recall, pr,  rr = get_prec_recall(model_dir, data_path,
             num_include, '', checkpoint=ckpt_file)
-        tf.reset_default_graph()
+        tf.compat.v1.reset_default_graph()
         cauc = auc(recall, precision)
         if cauc > best_auc:
             best_auc = cauc
@@ -406,7 +406,7 @@ def show_local_descr(model_dir, im_fls, train_dirs, cls):
         ims[i] = cv2.cvtColor(cv2.resize(cv2.imread(im_fls[i]), (vw,vh)), 
                     cv2.COLOR_BGR2RGB) / 255.
 
-    with tf.Session() as sess:
+    with tf.compat.v1.Session() as sess:
         calc = utils.CALC2(model_dir, sess)
         
         d_train = calc.run(train_ims).reshape((len(train_fls),

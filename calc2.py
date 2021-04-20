@@ -4,7 +4,8 @@ import os
 import sys
 import datetime
 import tensorflow as tf
-from tensorflow.contrib import slim
+import tf_slim as slim
+from hparams import HParams
 
 import numpy as np
 
@@ -28,29 +29,29 @@ with open('dataset/loss_weights.txt', 'r') as f:
             sep=' ', dtype=np.float32,
             count=N_CLASSES), (1,1,1,-1))
 
-FLAGS = tf.app.flags.FLAGS
+FLAGS = tf.compat.v1.app.flags.FLAGS
 if __name__ == '__main__':
-    tf.app.flags.DEFINE_string("mode", "train", "train, pr, ex, or best")
+    tf.compat.v1.app.flags.DEFINE_string("mode", "train", "train, pr, ex, or best")
 
-    tf.app.flags.DEFINE_string("model_dir", "model", "Estimator model_dir")
-    tf.app.flags.DEFINE_string("data_dir", "dataset/CampusLoopDataset", "Path to data")
-    tf.app.flags.DEFINE_string("title", "Precision-Recall Curve", "Plot title")
-    tf.app.flags.DEFINE_integer("n_include", 5, "")
+    tf.compat.v1.app.flags.DEFINE_string("model_dir", "model", "Estimator model_dir")
+    tf.compat.v1.app.flags.DEFINE_string("data_dir", "dataset/CampusLoopDataset", "Path to data")
+    tf.compat.v1.app.flags.DEFINE_string("title", "Precision-Recall Curve", "Plot title")
+    tf.compat.v1.app.flags.DEFINE_integer("n_include", 5, "")
 
-    tf.app.flags.DEFINE_integer("steps", 200000, "Training steps")
-    tf.app.flags.DEFINE_string(
+    tf.compat.v1.app.flags.DEFINE_integer("steps", 200000, "Training steps")
+    tf.compat.v1.app.flags.DEFINE_string(
         "hparams", "",
         "A comma-separated list of `name=value` hyperparameter values. This flag "
         "is used to override hyperparameter settings when manually "
         "selecting hyperparameters.")
 
-    tf.app.flags.DEFINE_integer("batch_size", 12, "Size of mini-batch.")
-    tf.app.flags.DEFINE_string("netvlad_feat", None, "Binary base file for NetVLAD features. If you did this for dataset XX, "
+    tf.compat.v1.app.flags.DEFINE_integer("batch_size", 12, "Size of mini-batch.")
+    tf.compat.v1.app.flags.DEFINE_string("netvlad_feat", None, "Binary base file for NetVLAD features. If you did this for dataset XX, "
             "the program will look for XX_db.bin and XX_q.bin")
-    tf.app.flags.DEFINE_string("input_dir", "/mnt/f3be6b3c-80bb-492a-98bf-4d0d674a51d6/coco/calc_tfrecords/", "tfrecords dir")
-    tf.app.flags.DEFINE_boolean("include_calc", False, "Include original calc in pr curve"
+    tf.compat.v1.app.flags.DEFINE_string("input_dir", "/mnt/f3be6b3c-80bb-492a-98bf-4d0d674a51d6/coco/calc_tfrecords/", "tfrecords dir")
+    tf.compat.v1.app.flags.DEFINE_boolean("include_calc", False, "Include original calc in pr curve"
             "Place in 'calc_model' directory if this is set")
-    tf.app.flags.DEFINE_string("image_fl", "", "")
+    tf.compat.v1.app.flags.DEFINE_string("image_fl", "", "")
 
 def create_input_fn(split, batch_size):
     """Returns input_fn for tf.estimator.Estimator.
@@ -78,31 +79,31 @@ def create_input_fn(split, batch_size):
 
 
             features_ = {}
-            features_['img'] = tf.FixedLenFeature([], tf.string)
-            features_['label'] = tf.FixedLenFeature([], tf.string)
+            features_['img'] = tf.io.FixedLenFeature([], tf.string)
+            features_['label'] = tf.io.FixedLenFeature([], tf.string)
 
             if split!='train':
-                features_['cl_live'] = tf.FixedLenFeature([], tf.string)
-                features_['cl_mem'] = tf.FixedLenFeature([], tf.string)
+                features_['cl_live'] = tf.io.FixedLenFeature([], tf.string)
+                features_['cl_mem'] = tf.io.FixedLenFeature([], tf.string)
 
-            fs = tf.parse_single_example(
-                serialized_example,
+            fs = tf.io.parse_single_example(
+                serialized=serialized_example,
                 features=features_
             )
             
 
-            fs['img'] = tf.reshape(tf.cast(tf.decode_raw(fs['img'], tf.uint8),
+            fs['img'] = tf.reshape(tf.cast(tf.io.decode_raw(fs['img'], tf.uint8),
                 tf.float32) / 255.0, [__vh,__vw,3])
-            fs['label'] = tf.reshape(tf.decode_raw(fs['label'], tf.uint8), [__vh,__vw])
+            fs['label'] = tf.reshape(tf.io.decode_raw(fs['label'], tf.uint8), [__vh,__vw])
             fs['label'] = tf.cast(tf.one_hot(fs['label'], N_CLASSES), tf.float32)
             if split!='train':
-                fs['cl_live'] = tf.reshape(tf.cast(tf.decode_raw(fs['cl_live'], tf.uint8),
+                fs['cl_live'] = tf.reshape(tf.cast(tf.io.decode_raw(fs['cl_live'], tf.uint8),
                     tf.float32) / 255.0, [__vh,__vw,3])
-                fs['cl_mem'] = tf.reshape(tf.cast(tf.decode_raw(fs['cl_mem'], tf.uint8),
+                fs['cl_mem'] = tf.reshape(tf.cast(tf.io.decode_raw(fs['cl_mem'], tf.uint8),
                     tf.float32) / 255.0, [__vh,__vw,3])
-                fs['cl_live'] = tf.reshape(tf.image.resize_images(fs['cl_live'],
+                fs['cl_live'] = tf.reshape(tf.image.resize(fs['cl_live'],
                     (vh, vw)), [vh,vw,3])
-                fs['cl_mem'] = tf.reshape(tf.image.resize_images(fs['cl_mem'],
+                fs['cl_mem'] = tf.reshape(tf.image.resize(fs['cl_mem'],
                     (vh, vw)), [vh,vw,3])
                
             return fs
@@ -129,7 +130,7 @@ def vss(images, is_training=False, ret_descr=False, reuse=False,
         ret_c_centers=False, ret_mu=False, ret_c5=False):
     
     # Variational Semantic Segmentator
-    with tf.variable_scope("VSS", reuse=reuse):
+    with tf.compat.v1.variable_scope("VSS", reuse=reuse):
         images = tf.identity(images, name='images')
         batch_norm_params = {
             'decay': 0.9997,
@@ -144,7 +145,7 @@ def vss(images, is_training=False, ret_descr=False, reuse=False,
             normalizer_fn=slim.batch_norm,
             normalizer_params=batch_norm_params,
             activation_fn=lambda x: tf.nn.elu(x),
-            weights_initializer=tf.contrib.layers.xavier_initializer(False),
+            weights_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution=("uniform" if False else "truncated_normal")),
             padding='SAME'):
             
             ### Encoder ####################################
@@ -156,19 +157,19 @@ def vss(images, is_training=False, ret_descr=False, reuse=False,
             r4 = slim.conv2d(r3, 16, [1,1])
             r5 = slim.conv2d(r4, 32, [3,3]) + r3
 
-            p1 = tf.layers.max_pooling2d(r5, [2,2], 2, padding='same')
+            p1 = tf.compat.v1.layers.max_pooling2d(r5, [2,2], 2, padding='same')
 
             d21 = slim.conv2d(p1, 64, [3,3])
             d22 = slim.conv2d(d21, 64, [3,3])
-            p2 = tf.layers.max_pooling2d(d22, [2,2], 2, padding='same')
+            p2 = tf.compat.v1.layers.max_pooling2d(d22, [2,2], 2, padding='same')
            
             d31 = slim.conv2d(p2, 128, [3,3])
             d32 = slim.conv2d(d31, 128, [3,3])
-            p3 = tf.layers.max_pooling2d(d32, [2,2], 2, padding='same')
+            p3 = tf.compat.v1.layers.max_pooling2d(d32, [2,2], 2, padding='same')
 
             d41 = slim.conv2d(p3, 256, [3,3])
             d42 = slim.conv2d(d41, 256, [3,3])
-            p4 = tf.layers.max_pooling2d(d42, [2,2], 2, padding='same')
+            p4 = tf.compat.v1.layers.max_pooling2d(d42, [2,2], 2, padding='same')
             
             d51 = slim.conv2d(p4, 512, [3,3])
             d52 = slim.conv2d(d51, 512, [3,3])
@@ -186,7 +187,7 @@ def vss(images, is_training=False, ret_descr=False, reuse=False,
                 return mu
                            
             sh = mu.get_shape().as_list()
-            c_centers = tf.get_variable('offset', 
+            c_centers = tf.compat.v1.get_variable('offset', 
                         initializer=tf.random.normal([1, sh[1], sh[2], sh[3]]),
                         trainable=True)
 
@@ -211,7 +212,7 @@ def vss(images, is_training=False, ret_descr=False, reuse=False,
 
             # z = mu + sigma * epsilon
             # epsilon is a sample from a N(0, 1) distribution
-            eps = tf.random_normal(tf.shape(mu), 0.0, 1.0, dtype=tf.float32)
+            eps = tf.random.normal(tf.shape(input=mu), 0.0, 1.0, dtype=tf.float32)
 
             # Random normal variable for decoder :D
             z = mu + tf.sqrt(tf.exp(log_sig_sq)) * eps
@@ -219,19 +220,19 @@ def vss(images, is_training=False, ret_descr=False, reuse=False,
             ### Decoder ####################################
             decoders = [] 
             for i in range(1+N_CLASSES):
-                u41 = tf.depth_to_space(slim.conv2d(z[:,:,:,i:(i+4)], 128, [3,3]), 2)
+                u41 = tf.compat.v1.depth_to_space(input=slim.conv2d(z[:,:,:,i:(i+4)], 128, [3,3]), block_size=2)
                 u42 = slim.conv2d(u41, 128, [3,3])
                 u43 = slim.conv2d(u42, 128, [3,3])
                 
-                u31 = slim.conv2d(tf.depth_to_space(u43, 2),64, [3,3])
+                u31 = slim.conv2d(tf.compat.v1.depth_to_space(input=u43, block_size=2),64, [3,3])
                 u32 = slim.conv2d(u31, 64, [3,3])
                 u33 = slim.conv2d(u32, 64, [3,3])
                 
-                u21 = slim.conv2d(tf.depth_to_space(u33, 2), 32, [3,3])
+                u21 = slim.conv2d(tf.compat.v1.depth_to_space(input=u33, block_size=2), 32, [3,3])
                 u22 = slim.conv2d(u21, 32, [3,3])
                 u23 = slim.conv2d(u22, 32, [3,3])
 
-                u11 = slim.conv2d(tf.depth_to_space(u23, 2), 16, [3,3])
+                u11 = slim.conv2d(tf.compat.v1.depth_to_space(input=u23, block_size=2), 16, [3,3])
                 u12 = slim.conv2d(u11, 16, [3,3])
                 u13 = slim.conv2d(u12, 16, [3,3])
 
@@ -256,7 +257,7 @@ def model_fn(features, labels, mode, hparams):
     
     im_l = tf.concat([features['img'], features['label']], axis=-1)
     #x = tf.image.random_flip_left_right(im_l)
-    x = tf.image.random_crop(im_l, [tf.shape(im_l)[0], vh, vw, 3 + N_CLASSES])
+    x = tf.image.random_crop(im_l, [tf.shape(input=im_l)[0], vh, vw, 3 + N_CLASSES])
     features['img'] = x[:,:,:,:3]
     labels = x[:,:,:,3:]
     if is_training:
@@ -267,18 +268,18 @@ def model_fn(features, labels, mode, hparams):
     im_warp = tf.image.random_flip_left_right(images)
     im_warp = layers.rand_warp(im_warp, [vh, vw])
     im_w_adj = tf.clip_by_value(im_warp + \
-            tf.random.uniform([tf.shape(im_warp)[0], 1, 1, 1], -.8, 0.0), 
+            tf.random.uniform([tf.shape(input=im_warp)[0], 1, 1, 1], -.8, 0.0), 
             0.0, 1.0)
-    tf.where(tf.less(tf.reduce_mean(im_warp, axis=[1,2,3]), 0.2), im_warp, im_w_adj)
+    tf.compat.v1.where(tf.less(tf.reduce_mean(input_tensor=im_warp, axis=[1,2,3]), 0.2), im_warp, im_w_adj)
 
     mu, log_sig_sq, rec, seg, z, c_centers, descr = vss(images, is_training)
     descr_p = vss(im_warp, is_training, True, True)
     descr_n = utils.hard_neg_mine(descr)
 
-    lp = tf.reduce_sum(descr_p * descr, -1)
-    ln = tf.reduce_sum(descr_n * descr, -1)
+    lp = tf.reduce_sum(input_tensor=descr_p * descr, axis=-1)
+    ln = tf.reduce_sum(input_tensor=descr_n * descr, axis=-1)
     m = 0.5
-    simloss = tf.reduce_mean(tf.maximum(tf.zeros_like(ln), ln + m - lp))
+    simloss = tf.reduce_mean(input_tensor=tf.maximum(tf.zeros_like(ln), ln + m - lp))
     
     #labels = tf.cast(labels, tf.bool)
     #label_ext = tf.concat([tf.expand_dims(labels,-1), 
@@ -289,15 +290,15 @@ def model_fn(features, labels, mode, hparams):
     else:
         _seg = tf.nn.softmax(seg[:FLAGS.batch_size//3], axis=-1)
     
-    weights = tf.placeholder_with_default(_weights, _weights.shape)
-    weights = weights / tf.reduce_min(weights)
+    weights = tf.compat.v1.placeholder_with_default(_weights, _weights.shape)
+    weights = weights / tf.reduce_min(input_tensor=weights)
     _seg = tf.clip_by_value(_seg, 1e-6, 1.0)
     segloss = tf.reduce_mean(  
-         -tf.reduce_sum(labels * weights * tf.log(_seg), axis=-1))
+         input_tensor=-tf.reduce_sum(input_tensor=labels * weights * tf.math.log(_seg), axis=-1))
 
     recloss = tf.reduce_mean(  
-         -tf.reduce_sum(images * tf.log(tf.clip_by_value(rec, 1e-10, 1.0))
-         + (1.0 - images) * tf.log(tf.clip_by_value(1.0 - rec, 1e-10, 1.0)),
+         input_tensor=-tf.reduce_sum(input_tensor=images * tf.math.log(tf.clip_by_value(rec, 1e-10, 1.0))
+         + (1.0 - images) * tf.math.log(tf.clip_by_value(1.0 - rec, 1e-10, 1.0)),
          axis=[1, 2, 3]))
 
     sh = mu.get_shape().as_list()
@@ -307,12 +308,12 @@ def model_fn(features, labels, mode, hparams):
     # stdev is the diagonal of the covariance matrix
     # .5 (tr(sigma2) + mu^T mu - k - log det(sigma2))
     kld = tf.reduce_mean(
-            -0.5 * (tf.reduce_sum(1.0 + s - tf.square(m) - tf.exp(s),
+            input_tensor=-0.5 * (tf.reduce_sum(input_tensor=1.0 + s - tf.square(m) - tf.exp(s),
             axis=-1))) 
 
-    kld = tf.check_numerics(kld, '\n\n\n\nkld is inf or nan!\n\n\n')
-    recloss = tf.check_numerics(recloss, '\n\n\n\nrecloss is inf or nan!\n\n\n')
-    segloss = tf.check_numerics(segloss, '\n\n\n\nsegloss is inf or nan!\n\n\n')
+    kld = tf.debugging.check_numerics(kld, '\n\n\n\nkld is inf or nan!\n\n\n')
+    recloss = tf.debugging.check_numerics(recloss, '\n\n\n\nrecloss is inf or nan!\n\n\n')
+    segloss = tf.debugging.check_numerics(segloss, '\n\n\n\nsegloss is inf or nan!\n\n\n')
 
     loss = segloss + \
             0.0001 * kld + \
@@ -320,9 +321,9 @@ def model_fn(features, labels, mode, hparams):
             simloss  
 
     prob = _seg[0,:,:,:]
-    pred = tf.argmax(prob, axis=-1)
+    pred = tf.argmax(input=prob, axis=-1)
 
-    mask = tf.argmax(labels[0], axis=-1)
+    mask = tf.argmax(input=labels[0], axis=-1)
     if not is_training:
         
         dlive = descr[(FLAGS.batch_size//3):(2*FLAGS.batch_size//3)]       
@@ -330,13 +331,13 @@ def model_fn(features, labels, mode, hparams):
 
         # Compare each combination of live to mem
         tlive = tf.tile(dlive,
-                [tf.shape(dlive)[0], 1]) # [l0, l1, l2..., l0, l1, l2...]
+                [tf.shape(input=dlive)[0], 1]) # [l0, l1, l2..., l0, l1, l2...]
 
         tmem = tf.reshape(tf.tile(tf.expand_dims(dmem, 1),
-                [1, tf.shape(dlive)[0], 1]),
+                [1, tf.shape(input=dlive)[0], 1]),
                 [-1, dlive.get_shape().as_list()[1]]) # [m0, m0, m0..., m1, m1, m1...]
         
-        sim = tf.reduce_sum(tlive * tmem, axis=-1) # Cosine sim for rgb data + class data
+        sim = tf.reduce_sum(input_tensor=tlive * tmem, axis=-1) # Cosine sim for rgb data + class data
         # Average score across rgb + classes. Map from [-1,1] -> [0,1]
         sim = (1.0 + sim) / 2.0
 
@@ -348,43 +349,43 @@ def model_fn(features, labels, mode, hparams):
             dtype=tf.int64), [-1])
 
         # ID of nearest neighbor from 
-        ids = tf.argmax(sim_sq, axis=-1)
+        ids = tf.argmax(input=sim_sq, axis=-1)
 
         # I guess just contiguously index it?
         row_inds = tf.range(0, FLAGS.batch_size//3,
                 dtype=tf.int64) * (FLAGS.batch_size//3-1)
         buffer_inds = row_inds + ids
-        sim_nn = tf.nn.embedding_lookup(sim, buffer_inds)
+        sim_nn = tf.nn.embedding_lookup(params=sim, ids=buffer_inds)
         # Pull out the labels if it was correct (0 or 1)
-        lab = tf.nn.embedding_lookup(labm, buffer_inds)
+        lab = tf.nn.embedding_lookup(params=labm, ids=buffer_inds)
     def touint8(img):
         return tf.cast(img * 255.0, tf.uint8)
     _im = touint8(images[0])
     _rec = touint8(rec[0])
 
 
-    with tf.variable_scope("stats"):
-        tf.summary.scalar("loss", loss)
-        tf.summary.scalar("segloss", segloss)
-        tf.summary.scalar("kld", kld)
-        tf.summary.scalar("recloss", recloss)
-        tf.summary.scalar("simloss", simloss)
-        tf.summary.histogram("z", z)
-        tf.summary.histogram("mu", mu)
-        tf.summary.histogram("sig", tf.exp(log_sig_sq))
-        tf.summary.histogram("clust_centers", c_centers)
+    with tf.compat.v1.variable_scope("stats"):
+        tf.compat.v1.summary.scalar("loss", loss)
+        tf.compat.v1.summary.scalar("segloss", segloss)
+        tf.compat.v1.summary.scalar("kld", kld)
+        tf.compat.v1.summary.scalar("recloss", recloss)
+        tf.compat.v1.summary.scalar("simloss", simloss)
+        tf.compat.v1.summary.histogram("z", z)
+        tf.compat.v1.summary.histogram("mu", mu)
+        tf.compat.v1.summary.histogram("sig", tf.exp(log_sig_sq))
+        tf.compat.v1.summary.histogram("clust_centers", c_centers)
 
     eval_ops = {
-              "Test Error": tf.metrics.mean(loss),
-              "Seg Error": tf.metrics.mean(segloss),
-              "Rec Error": tf.metrics.mean(recloss),
-              "KLD Error": tf.metrics.mean(kld),
-              "Sim Error": tf.metrics.mean(simloss),
+              "Test Error": tf.compat.v1.metrics.mean(loss),
+              "Seg Error": tf.compat.v1.metrics.mean(segloss),
+              "Rec Error": tf.compat.v1.metrics.mean(recloss),
+              "KLD Error": tf.compat.v1.metrics.mean(kld),
+              "Sim Error": tf.compat.v1.metrics.mean(simloss),
     }
 
     if not is_training:
         # Closer to 1 is better
-        eval_ops["AUC"] = tf.metrics.auc(lab, sim_nn, curve='PR')
+        eval_ops["AUC"] = tf.compat.v1.metrics.auc(lab, sim_nn, curve='PR')
     to_return = {
           "loss": loss,
           "segloss": segloss,
@@ -412,7 +413,7 @@ def model_fn(features, labels, mode, hparams):
 def _default_hparams():
     """Returns default or overridden user-specified hyperparameters."""
 
-    hparams = tf.contrib.training.HParams(
+    hparams = HParams(
           learning_rate=1.0e-3
     )
     if FLAGS.hparams:
@@ -423,7 +424,7 @@ def _default_hparams():
 def main(argv):
     del argv
     
-    tf.logging.set_verbosity(tf.logging.ERROR)
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
     if FLAGS.mode == 'train':
         hparams = _default_hparams()
@@ -459,4 +460,4 @@ def main(argv):
 if __name__ == "__main__":
     sys.excepthook = utils.colored_hook(
         os.path.dirname(os.path.realpath(__file__)))
-    tf.app.run()
+    tf.compat.v1.app.run()

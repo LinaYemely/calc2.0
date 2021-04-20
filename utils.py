@@ -6,7 +6,7 @@ import math
 import numpy as np
 import os
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
+import tf_slim as slim
 from tensorflow.python.client import device_lib
 
 import matplotlib
@@ -40,7 +40,7 @@ class CALC2(object):
         self.sess = sess
         self.ret_c5 = ret_c5
         self.ret_c_centers = ret_c_centers
-        self.images = tf.placeholder(tf.float32, [None, vh, vw, 3])    
+        self.images = tf.compat.v1.placeholder(tf.float32, [None, vh, vw, 3])    
         ret = vss(self.images, False, True, 
                 ret_mu=use_mu, ret_c_centers=ret_c_centers,
                 ret_c5=ret_c5)
@@ -51,9 +51,9 @@ class CALC2(object):
             self.descriptor = ret[0]
             self.cc = ret[1]
         else:
-            self.descriptor = ret if not use_mu else tf.reduce_mean(ret, axis=0, keepdims=True)
+            self.descriptor = ret if not use_mu else tf.reduce_mean(input_tensor=ret, axis=0, keepdims=True)
 
-        saver = tf.train.Saver()
+        saver = tf.compat.v1.train.Saver()
         if checkpoint is None:
             ckpt = tf.train.get_checkpoint_state(model_dir)
             cpath = ckpt.model_checkpoint_path
@@ -176,10 +176,10 @@ def kp_descriptor(tensor):
 def show_example(image_fl, model_dir):
     im = cv2.cvtColor(cv2.resize(cv2.imread(image_fl), 
         (vw, vh)), cv2.COLOR_BGR2RGB)[np.newaxis, ...] / 255.0
-    _im = tf.placeholder_with_default(im.astype(np.float32), im.shape)
+    _im = tf.compat.v1.placeholder_with_default(im.astype(np.float32), im.shape)
     _, _, rec, seg, _, _, _ = vss(_im, False)
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+    with tf.compat.v1.Session() as sess:
+        sess.run(tf.compat.v1.global_variables_initializer())
         rec, seg = sess.run([rec, seg])
         rec = (255*np.squeeze(rec)).astype(np.uint8)
         seg = np.argmax(np.squeeze(seg), axis=-1)
@@ -197,12 +197,12 @@ def show_example(image_fl, model_dir):
 
 def display_trainable_parameters():
     total_parameters = 0
-    for variable in tf.trainable_variables():
+    for variable in tf.compat.v1.trainable_variables():
         #print(variable.name)
         shape = variable.get_shape()
         variable_parameters = 1
         for dim in shape:
-            variable_parameters *= dim.value
+            variable_parameters *= dim
         total_parameters += variable_parameters
 
     print("\n\nTrainable Parameters: %d\n\n" % total_parameters)
@@ -276,7 +276,7 @@ def mask_helper(im, pred, rec, mask, title):
 
 
 def hard_neg_mine(descr):
-    n = tf.shape(descr)[0]
+    n = tf.shape(input=descr)[0]
     tlive = tf.tile(descr,
             [n, 1]) # [l0, l1, l2..., l0, l1, l2...]
 
@@ -284,7 +284,7 @@ def hard_neg_mine(descr):
             [1, n, 1]),
             [-1, descr.get_shape().as_list()[1]]) # [m0, m0, m0..., m1, m1, m1...]
     
-    sim = tf.reduce_sum(tlive * tmem, axis=-1) # Cosine sim for rgb data + class data
+    sim = tf.reduce_sum(input_tensor=tlive * tmem, axis=-1) # Cosine sim for rgb data + class data
     
     sim_sq = tf.reshape(sim,
         [n, n])
@@ -294,7 +294,7 @@ def hard_neg_mine(descr):
     sim_sq = sim_sq - 3*tf.eye(n, dtype=tf.float32)
 
     # ID of nearest neighbor
-    ids = tf.argmax(sim_sq, 
+    ids = tf.argmax(input=sim_sq, 
             axis=-1, output_type=tf.int32)
 
     # I guess just contiguously index it?
@@ -303,7 +303,7 @@ def hard_neg_mine(descr):
     buffer_inds = row_inds + ids
     #sim_nn = tf.nn.embedding_lookup(sim, buffer_inds)
     # Pull out the hard negative descriptors
-    descr_n = tf.nn.embedding_lookup(tlive, buffer_inds)
+    descr_n = tf.nn.embedding_lookup(params=tlive, ids=buffer_inds)
     return descr_n
 
 def log_msg(col_hdrs, row_hdr, values):
@@ -323,7 +323,7 @@ def log_msg(col_hdrs, row_hdr, values):
 
 
 
-class TrainingHook(tf.train.SessionRunHook):
+class TrainingHook(tf.estimator.SessionRunHook):
     """A utility for displaying training information such as the loss, percent
     completed, estimated finish date and time."""
 
@@ -337,7 +337,7 @@ class TrainingHook(tf.train.SessionRunHook):
         self.current_interval = 0
 
     def before_run(self, run_context):
-        graph = tf.get_default_graph()
+        graph = tf.compat.v1.get_default_graph()
         runargs = {
             "loss": graph.get_collection("total_loss")[0],
             "segloss": graph.get_collection("segloss")[0],
@@ -350,11 +350,11 @@ class TrainingHook(tf.train.SessionRunHook):
             "label": graph.get_collection("label")[0],
         }
 
-        return tf.train.SessionRunArgs(runargs)
+        return tf.estimator.SessionRunArgs(runargs)
 
 
     def after_run(self, run_context, run_values):
-        step = run_context.session.run(tf.train.get_global_step())
+        step = run_context.session.run(tf.compat.v1.train.get_global_step())
         now = time.time()
 
         if self.current_interval < self.eta_interval:
@@ -393,7 +393,7 @@ class TrainingHook(tf.train.SessionRunHook):
         self.last_time = now
 
 
-class PredictionHook(tf.train.SessionRunHook):
+class PredictionHook(tf.estimator.SessionRunHook):
 
     def __init__(self):
         pass
@@ -404,7 +404,7 @@ class PredictionHook(tf.train.SessionRunHook):
     def after_run(self, run_context, run_values):
         pass
 
-class EvalHook(tf.train.SessionRunHook):
+class EvalHook(tf.estimator.SessionRunHook):
     """A utility for displaying training information such as the loss, percent
     completed, estimated finish date and time."""
 
@@ -418,7 +418,7 @@ class EvalHook(tf.train.SessionRunHook):
             os.makedirs(savedir)                        
 
     def before_run(self, run_context):
-        graph = tf.get_default_graph()
+        graph = tf.compat.v1.get_default_graph()
         runargs = {
             "loss": graph.get_collection("total_loss")[0],
             "segloss": graph.get_collection("segloss")[0],
@@ -430,11 +430,11 @@ class EvalHook(tf.train.SessionRunHook):
             "rec": graph.get_collection("rec")[0],
             "label": graph.get_collection("label")[0],
         }
-        return tf.train.SessionRunArgs(runargs)
+        return tf.estimator.SessionRunArgs(runargs)
 
     def after_run(self, run_context, run_values):
 
-        step = run_context.session.run(tf.train.get_global_step())
+        step = run_context.session.run(tf.compat.v1.train.get_global_step())
         
         if self.i == 0:
             
@@ -478,15 +478,15 @@ def standard_model_fn(func, steps, run_config,
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
         ret = func(features, labels, mode, params)
-        tf.add_to_collection("total_loss", ret["loss"])
-        tf.add_to_collection("segloss", ret["segloss"])
-        tf.add_to_collection("recloss", ret["recloss"])
-        tf.add_to_collection("simloss", ret["simloss"])
-        tf.add_to_collection("kld", ret["kld"])
-        tf.add_to_collection("im", ret["im"])
-        tf.add_to_collection("pred", ret["pred"])
-        tf.add_to_collection("rec", ret["rec"])
-        tf.add_to_collection("label", ret["label"])
+        tf.compat.v1.add_to_collection("total_loss", ret["loss"])
+        tf.compat.v1.add_to_collection("segloss", ret["segloss"])
+        tf.compat.v1.add_to_collection("recloss", ret["recloss"])
+        tf.compat.v1.add_to_collection("simloss", ret["simloss"])
+        tf.compat.v1.add_to_collection("kld", ret["kld"])
+        tf.compat.v1.add_to_collection("im", ret["im"])
+        tf.compat.v1.add_to_collection("pred", ret["pred"])
+        tf.compat.v1.add_to_collection("rec", ret["rec"])
+        tf.compat.v1.add_to_collection("label", ret["label"])
         
         train_op = None
 
@@ -499,11 +499,13 @@ def standard_model_fn(func, steps, run_config,
             training_hooks.append(TrainingHook(steps, eval_steps))
 
             if optimizer_fn is None:
-                optimizer = tf.train.AdamOptimizer(params.learning_rate)
+                optimizer = tf.compat.v1.train.AdamOptimizer(params.learning_rate, clipnorm=5)
             else:
                 optimizer = optimizer_fn
 
-            optimizer = tf.contrib.estimator.clip_gradients_by_norm(optimizer, 5)
+            #optimizer = tf.contrib.estimator.clip_gradients_by_norm(optimizer, 5)
+            #optimizer = slim._clip_gradients_by_norm(optimizer, 5)
+            optimizer.__dict__.update(clipnorm=5)
             train_op = slim.learning.create_train_op(ret["loss"], optimizer)
 
 
@@ -556,7 +558,7 @@ def train_and_eval(model_dir,
     None
     """
     n_gpus = num_gpus()
-    strategy = tf.contrib.distribute.MirroredStrategy(num_gpus=n_gpus)
+    strategy = tf.distribute.MirroredStrategy()
 
     run_config = tf.estimator.RunConfig(
       model_dir=model_dir,

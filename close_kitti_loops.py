@@ -68,7 +68,7 @@ def kitti_loop(gui, vo_fn, im_dir, seq):
     j = 0
 
     with open(vo_fn, 'r') as vo_f, open('kitti_traj.txt', 'w') as t_f, \
-            open('kitti_loops.txt', 'w') as l_f, tf.Session() as sess:
+            open('kitti_loops.txt', 'w') as l_f, tf.compat.v1.Session() as sess:
         
         calc = utils.CALC2('model', sess, ret_c5=True)
         qt = []

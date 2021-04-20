@@ -13,14 +13,14 @@ from time import time
 vw = 320
 vh = 320
 
-FLAGS = tf.app.flags.FLAGS
+FLAGS = tf.compat.v1.app.flags.FLAGS
 
 if __name__ == '__main__':
    
-    tf.app.flags.DEFINE_string("output_dir", "/mnt/f3be6b3c-80bb-492a-98bf-4d0d674a51d6/coco/calc_tfrecords/", "")
-    tf.app.flags.DEFINE_string("coco_root", "/mnt/f3be6b3c-80bb-492a-98bf-4d0d674a51d6/coco/", "")
-    tf.app.flags.DEFINE_integer("num_files", 100, "Num files to write for train dataset. More files=better randomness")
-    tf.app.flags.DEFINE_boolean("debug", False, "")
+    tf.compat.v1.app.flags.DEFINE_string("output_dir", "/mnt/f3be6b3c-80bb-492a-98bf-4d0d674a51d6/coco/calc_tfrecords/", "")
+    tf.compat.v1.app.flags.DEFINE_string("coco_root", "/mnt/f3be6b3c-80bb-492a-98bf-4d0d674a51d6/coco/", "")
+    tf.compat.v1.app.flags.DEFINE_integer("num_files", 100, "Num files to write for train dataset. More files=better randomness")
+    tf.compat.v1.app.flags.DEFINE_boolean("debug", False, "")
     
 
     if FLAGS.debug:
@@ -50,10 +50,10 @@ def generate():
     train_writers = []
     for ii in range(FLAGS.num_files):
         train_writers.append(None if FLAGS.debug else \
-                tf.python_io.TFRecordWriter(FLAGS.output_dir + "train_data%d.tfrecord" % ii))
+                tf.io.TFRecordWriter(FLAGS.output_dir + "train_data%d.tfrecord" % ii))
     
     val_writer = None if FLAGS.debug else \
-            tf.python_io.TFRecordWriter(FLAGS.output_dir + "validation_data.tfrecord")
+            tf.io.TFRecordWriter(FLAGS.output_dir + "validation_data.tfrecord")
 
 
     nclasses = len(calc_classes.keys())
@@ -171,4 +171,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    tf.app.run()
+    tf.compat.v1.app.run()
