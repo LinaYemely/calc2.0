@@ -30,6 +30,9 @@ with open('dataset/loss_weights.txt', 'r') as f:
             count=N_CLASSES), (1,1,1,-1))
 
 FLAGS = tf.compat.v1.app.flags.FLAGS
+
+HOME = os.getenv("HOME")
+
 if __name__ == '__main__':
     tf.compat.v1.app.flags.DEFINE_string("mode", "train", "train, pr, ex, or best")
 
@@ -48,7 +51,7 @@ if __name__ == '__main__':
     tf.compat.v1.app.flags.DEFINE_integer("batch_size", 12, "Size of mini-batch.")
     tf.compat.v1.app.flags.DEFINE_string("netvlad_feat", None, "Binary base file for NetVLAD features. If you did this for dataset XX, "
             "the program will look for XX_db.bin and XX_q.bin")
-    tf.compat.v1.app.flags.DEFINE_string("input_dir", "/mnt/f3be6b3c-80bb-492a-98bf-4d0d674a51d6/coco/calc_tfrecords/", "tfrecords dir")
+    tf.compat.v1.app.flags.DEFINE_string("input_dir", f"{HOME}/coco/calc_tfrecords/", "tfrecords dir")
     tf.compat.v1.app.flags.DEFINE_boolean("include_calc", False, "Include original calc in pr curve"
             "Place in 'calc_model' directory if this is set")
     tf.compat.v1.app.flags.DEFINE_string("image_fl", "", "")

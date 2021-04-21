@@ -15,10 +15,12 @@ vh = 320
 
 FLAGS = tf.compat.v1.app.flags.FLAGS
 
+HOME = os.getenv("HOME")
+
 if __name__ == '__main__':
    
-    tf.compat.v1.app.flags.DEFINE_string("output_dir", "/mnt/f3be6b3c-80bb-492a-98bf-4d0d674a51d6/coco/calc_tfrecords/", "")
-    tf.compat.v1.app.flags.DEFINE_string("coco_root", "/mnt/f3be6b3c-80bb-492a-98bf-4d0d674a51d6/coco/", "")
+    tf.compat.v1.app.flags.DEFINE_string("output_dir", f"{HOME}/coco/calc_tfrecords/", "")
+    tf.compat.v1.app.flags.DEFINE_string("coco_root", f"{HOME}/coco", "")
     tf.compat.v1.app.flags.DEFINE_integer("num_files", 100, "Num files to write for train dataset. More files=better randomness")
     tf.compat.v1.app.flags.DEFINE_boolean("debug", False, "")
     

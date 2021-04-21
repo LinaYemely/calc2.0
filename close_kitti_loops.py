@@ -8,6 +8,7 @@ import utils
 import calc2
 from time import time
 import tensorflow as tf
+import os
 
 vh = calc2.vh
 vw = calc2.vw
@@ -204,8 +205,9 @@ class Display:
         cv2.waitKey(1)
 
 if __name__ == '__main__':
+    HOME = os.getenv("HOME")
 
-    data_root = "/mnt/f3be6b3c-80bb-492a-98bf-4d0d674a51d6/kitti_odom/"
+    data_root = f"{HOME}/kitti_odom/"
     seq = "6"
     vo_fn = data_root + "dataset/poses/" + seq.zfill(2) + ".txt"
     im_dir = data_root + "dataset/sequences/" + seq.zfill(2) 
