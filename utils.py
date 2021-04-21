@@ -499,7 +499,7 @@ def standard_model_fn(func, steps, run_config,
             training_hooks.append(TrainingHook(steps, eval_steps))
 
             if optimizer_fn is None:
-                optimizer = tf.compat.v1.train.AdamOptimizer(params.learning_rate, clipnorm=5)
+                optimizer = tf.compat.v1.train.AdamOptimizer(params.learning_rate)#, clipnorm=5)
             else:
                 optimizer = optimizer_fn
 
